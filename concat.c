@@ -129,9 +129,9 @@
 // Modification here !
 #define JOIN_ELSE(x, y) y else x
 #define CHECK_AND_GET(n) \
-    if (get_global_id(2) >= OFFSET##n) \
+    if (get_global_id(2) >= OFFSET##n) { \
         src = src##n + get_global_id(1) * SRC##n##_EXT_OFFSET + x \
-                - OFFSET##n * INNER_OFFSET;
+                - OFFSET##n * INNER_OFFSET; if(SCALES_MASK & (1 << n)) *src *= *scale##n; }
 #define SET_SRC REDUCE(N_INPUTS, JOIN_ELSE, CHECK_AND_GET)
 
 #if BLOCK != 1
@@ -180,6 +180,7 @@ simple_concat(__global DATA_T *dst, long dst_offset0, SRC_PTRS, __global float* 
     A3 = BLOCK_READ8(&src[24 * SIMD]);
 #endif
     dst += dst_offset0 + get_global_id(1) * DST_EXT_OFFSET + x;
+    if(SCALE_DST) *dst /= *scale_dst;
 #if BLOCK == 1
     dst[0] = B;
 #elif BLOCK == SIMD
