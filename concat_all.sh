@@ -1,6 +1,7 @@
 #!/bin/bash
-bn="/oneDNN/build/tests/benchdnn/benchdnn"
-export OMP_NUM_THREADS=1
+bn="/libraries.performance.math.onednn/build/tests/benchdnn/benchdnn"
+
+#export OMP_NUM_THREADS=1
 ./$bn --concat --engine=gpu --batch=test_concat_gpu
 
 

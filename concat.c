@@ -121,18 +121,32 @@
 #define REDUCE2(n, cat, f) REDUCE_STAGE_##n(cat, f)
 #define REDUCE(n, cat, f) REDUCE2(n, cat, f)
 
+#define JOIN_PLUS(x, y) x + y
 #define JOIN_COMMA(x, y) x, y
 #define SRC_PTR(n) __global const DATA_T *src##n
 #define SCALE_PTR(n) __global const float *scale##n
 #define SRC_PTRS REDUCE(N_INPUTS, JOIN_COMMA, SRC_PTR)
 #define SCALE_PTRS REDUCE(N_INPUTS, JOIN_COMMA, SCALE_PTR)
-// Modification here !
+
+#define BITMASK(n) ((SCALES_MASK & (1 << n)) * (*scale##n) + 1.0)
+#define MASK_SET REDUCE(N_INPUTS,JOIN_PLUS,BITMASK)
+
 #define JOIN_ELSE(x, y) y else x
-#define CHECK_AND_GET(n) \
+#define CHECK_AND_GET(n)               \
     if (get_global_id(2) >= OFFSET##n) { \
+        if(SCALES_MASK & (1 << n)) tmp_src_scale = *scale##n; \
         src = src##n + get_global_id(1) * SRC##n##_EXT_OFFSET + x \
-                - OFFSET##n * INNER_OFFSET; if(SCALES_MASK & (1 << n)) *src *= *scale##n; }
+                - OFFSET##n * INNER_OFFSET; }
 #define SET_SRC REDUCE(N_INPUTS, JOIN_ELSE, CHECK_AND_GET)
+#define EXTRACT(x) x *= tmp_src_scale / SDST;
+
+#ifndef SDST
+#if SCALE_DST == 1
+#define SDST *scale_dst;
+#else
+#define SDST 1.0
+#endif
+#endif
 
 #if BLOCK != 1
 __attribute__((intel_reqd_sub_group_size(SIMD)))
@@ -143,6 +157,8 @@ simple_concat(__global DATA_T *dst, long dst_offset0, SRC_PTRS, __global float* 
     DATA_T B;
     DATA2_T C;
     DATA4_T D;
+    float tmp_src_scale = 1.0;
+
     const size_t x = (get_global_id(0) / SIMD) * BLOCK
             + get_global_id(2) * INNER_OFFSET;
     __global const DATA_T *src;
@@ -151,36 +167,54 @@ simple_concat(__global DATA_T *dst, long dst_offset0, SRC_PTRS, __global float* 
 
 #if BLOCK == 1
     B = src[0];
+    B *= tmp_src_scale / SDST;
 #elif BLOCK == SIMD
     B = BLOCK_READ(src);
+    B *= tmp_src_scale / SDST;
 #elif BLOCK == 2 * SIMD
     C = BLOCK_READ2(src);
+    C *= tmp_src_scale / SDST;
 #elif BLOCK == 3 * SIMD
     C = BLOCK_READ2(src);
     B = BLOCK_READ(&src[2 * SIMD]);
+    C *= tmp_src_scale / SDST;
+    B *= tmp_src_scale / SDST;
 #elif BLOCK == 4 * SIMD
-    D = BLOCK_READ4(src);
+     D = BLOCK_READ4(src);
+     D *= tmp_src_scale / SDST;
 #elif BLOCK == 5 * SIMD
     D = BLOCK_READ4(src);
     B = BLOCK_READ(&src[4 * SIMD]);
+    D *= tmp_src_scale / SDST;
+    B *= tmp_src_scale / SDST;
 #elif BLOCK == 6 * SIMD
     D = BLOCK_READ4(src);
     C = BLOCK_READ2(&src[4 * SIMD]);
+    D *= tmp_src_scale / SDST;
+    C *= tmp_src_scale / SDST;
 #elif BLOCK == 7 * SIMD
     B = BLOCK_READ(src);
     C = BLOCK_READ2(&src[SIMD]);
     D = BLOCK_READ4(&src[3 * SIMD]);
+    B *= tmp_src_scale / SDST;
+    C *= tmp_src_scale / SDST;
+    D *= tmp_src_scale / SDST;
 #elif BLOCK >= 8 * SIMD
     A0 = BLOCK_READ8(src);
+    A0 *= tmp_src_scale / SDST;
 #elif BLOCK >= 16 * SIMD
     A1 = BLOCK_READ8(&src[8 * SIMD]);
+    A1 *= tmp_src_scale / SDST;
 #elif BLOCK >= 24 * SIMD
     A2 = BLOCK_READ8(&src[16 * SIMD]);
+    A2 *= tmp_src_scale / SDST;
 #elif BLOCK >= 32 * SIMD
     A3 = BLOCK_READ8(&src[24 * SIMD]);
+    A3 *= tmp_src_scale / SDST;
 #endif
-    dst += dst_offset0 + get_global_id(1) * DST_EXT_OFFSET + x;
-    if(SCALE_DST) *dst /= *scale_dst;
+   EXTRACT(A3)
+   dst += dst_offset0 + get_global_id(1) * DST_EXT_OFFSET + x;
+
 #if BLOCK == 1
     dst[0] = B;
 #elif BLOCK == SIMD
