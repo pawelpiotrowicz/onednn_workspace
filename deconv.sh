@@ -12,7 +12,8 @@ usage;
 fi
 
 if [ "$1" == "--conv-all" ]; then
-./$bn --conv --engine=gpu --batch=test_conv_gpu
+#./$bn --conv --engine=gpu --mode=L --batch=test_conv_gpu 
+./$bn --conv --engine=gpu  --batch=test_conv_gpu 
 exit;
 fi
 
