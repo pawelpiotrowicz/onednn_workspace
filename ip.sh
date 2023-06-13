@@ -1,6 +1,6 @@
 #!/bin/bash
 bn="/libraries.performance.math.onednn/build/tests/benchdnn/benchdnn"
-export DNNL_VERBOSE=1
+#export DNNL_VERBOSE=1
 #export DNNL_VERBOSE=debuginfo=10
 #export LD_PRELOAD=`pwd`/libcldump1.so
 
@@ -8,7 +8,7 @@ export DNNL_VERBOSE=1
 #export ZE_AFFINITY_MASK=0.2
 usage() {
 
-echo "exit() : --all --all_ci --fail "
+echo "exit() : --all --ci --gpu --fail "
 exit
 }
 
@@ -24,14 +24,20 @@ cgdb --args ./$bn --softmax --dir=BWD_D --sdt=f64 --axis=0 16x16_nsoftmax_ci_0d:
 fi
 
 if [ "$1" == "--all" ]; then
-./$bn --softmax --engine=gpu --batch=test_softmax_all
-#./$bn --softmax --engine=gpu --batch=test_softmax_gpu
+#./$bn --ip --mode=L --engine=gpu --batch=test_ip_all
+./$bn --ip  --engine=gpu --batch=test_ip_all
+#./$bn --ip --engine=gpu --batch=test_ip_gpu
+#./$bn --ip --mode=L --engine=gpu --batch=test_ip_ci
 exit;
 fi
 
-if [ "$1" == "--all_ci" ]; then
-./$bn --softmax --engine=gpu --batch=test_softmax_ci
+if [ "$1" == "--ci" ]; then
+./$bn --ip --engine=gpu --batch=test_ip_ci
+exit;
+fi
 
+if [ "$1" == "--gpu" ]; then
+./$bn --ip --engine=gpu --batch=test_ip_gpu
 exit;
 fi
 
@@ -46,7 +52,27 @@ failed() {
 ./$bn --softmax --engine=gpu --dir=BWD_D --sdt=bf16 --ddt=bf16 --alg=LOGSOFTMAX --axis=3 2x16x128x128
 }
 
+if [ "$1" == "--test" ]; then
+
+
+input="lip.txt"
+while IFS= read -r line
+do
+ ./$bn  $line
+done < "$input"
+
+
+fi
 if [ "$1" == "--fail" ]; then
+./$bn --ip --engine=gpu --dir=BWD_WB mb1000ic1oc1
+./$bn --ip --engine=gpu --attr-post-ops=sum:0.5+relu:0.5+add:f32:per_oc ic2048oc1000n"resnet:ip1"
+
+./$bn --ip --engine=gpu --dir=BWD_WB --cfg=f16 --stag=ab --wtag=ba --dtag=ab mb11456ic96oc16 
+./$bn --ip --engine=gpu --dir=BWD_WB --skip-impl=ref --cfg=f16 --stag=ab --wtag=ba --dtag=ab mb11456ic96oc16 
+
+./$bn --ip --engine=gpu  --dir=BWD_WB --dt=f16:f32:f16 ic128iw5oc128n"1d:ip"
+
+#./$bn --ip --engine=gpu --dir=BWD_WB --cfg=f32 --stag=ab --wtag=ba --dtag=ab mb11456ic96oc16 
 #./$bn --softmax --engine=gpu --sdt=f32 --ddt=f32 --axis=0 96x1000
 #./$bn --softmax --engine=gpu --sdt=f64 --ddt=f64 --axis=0 96x1000
 #./$bn --softmax --engine=gpu --ddt=f64 --axis=0 --inplace=true 96x1000
@@ -71,13 +97,8 @@ if [ "$1" == "--fail" ]; then
 
 
 #./$bn --softmax --engine=gpu --dir=BWD_D --sdt=f64 --axis=0 16x16_nsoftmax_ci_0d:0
-./$bn --softmax  --sdt=f64 --axis=0 16x16_nsoftmax_ci_0d:0
+#./$bn --softmax  --sdt=f64 --axis=0 16x16_nsoftmax_ci_0d:0
 
-echo "=============================================================================="
-./$bn --softmax --dir=BWD_D --axis=0 16x16_nsoftmax_ci_0d:0
-echo "======================================"
-./$bn --softmax --dir=BWD_D --sdt=f64 --axis=0 16x16_nsoftmax_ci_0d:0
-./$bn --softmax --dir=BWD_D --axis=0 16x16_nsoftmax_ci_0d:0
 
 exit;
 fi

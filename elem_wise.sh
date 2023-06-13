@@ -30,6 +30,7 @@ fi
 
 
 if [ "$1" == "--fail" ]; then
+./$bn --eltwise --engine=gpu --dir=BWD_D --dt=f64 --alg=abs --alpha=0 --beta=0 16x16x2x1
 ./$bn --eltwise --engine=gpu  --skip-impl=ref --dt=f32 --alg=log --alpha=0 --beta=0 5x16x3
 ./$bn --eltwise --engine=gpu --skip-impl=ref --dir=FWD_I --dt=s32 --tag=axb --alg=relu --alpha=-0.25 --beta=0 3x17x2x5x3
 ./$bn --eltwise --engine=gpu --skip-impl=ref --dir=FWD_I --dt=s32 --tag=axb --alg=linear --alpha=-0.25 --beta=-0.25 --inplace=true 3x17x2x5x3
